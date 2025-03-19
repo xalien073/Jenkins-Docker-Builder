@@ -4,13 +4,12 @@ FROM alpine:3.19
 # Set environment variables
 ENV SONAR_SCANNER_VERSION=4.8.0.2856
 ENV TRIVY_VERSION=0.50.0
-ENV DOCKER_VERSION=24.0.7
 
 # Install necessary packages and update vulnerable components
 RUN apk add --no-cache \
     busybox \
     krb5-libs \
-    docker-cli=${DOCKER_VERSION}-r0 \
+    docker-cli \
     containerd \
     runc \
     curl \
