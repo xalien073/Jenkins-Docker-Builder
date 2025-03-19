@@ -1,41 +1,31 @@
-# Use latest secure Alpine image
-FROM alpine:3.19
+FROM alpine:latest
 
-# Set environment variables
-ENV SONAR_SCANNER_VERSION=4.8.0.2856
-ENV TRIVY_VERSION=0.50.0
-ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk"
-ENV PATH="/opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin:$PATH"
-
-# Install dependencies and update BusyBox securely
-RUN apk add --no-cache \
-    bash \
-    busybox \
-    containerd \
+# Install dependencies including Docker
+RUN apk update && apk add --no-cache \
+    openjdk11 \
     curl \
-    docker-cli \
-    git \
-    krb5-libs \
-    openjdk17-jre \
-    runc \
     unzip \
-    && apk upgrade --no-cache
+    python3 \
+    py3-pip \
+    git \
+    jq \
+    docker \
+    docker-cli
 
-# Download and install Sonar Scanner
-RUN curl -fsSL "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip" -o /tmp/sonar-scanner.zip \
-    && unzip /tmp/sonar-scanner.zip -d /opt/ \
-    && rm /tmp/sonar-scanner.zip \
-    && echo "sonar.java.binaries=." >> /opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/conf/sonar-scanner.properties \
-    && echo "sonar.search.javaHome=${JAVA_HOME}" >> /opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/conf/sonar-scanner.properties
+# Install Sonar Scanner
+RUN curl -o sonar-scanner.zip -L "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.7.0.2747-linux.zip" && \
+    unzip sonar-scanner.zip -d /opt && \
+    ln -s /opt/sonar-scanner-4.7.0.2747-linux/bin/sonar-scanner /usr/bin/sonar-scanner && \
+    sed -i 's/use_embedded_jre=true/use_embedded_jre=false/' /opt/sonar-scanner-4.7.0.2747-linux/bin/sonar-scanner && \
+    rm sonar-scanner.zip
 
 # Install Trivy
-RUN curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | tar xz -C /usr/local/bin
+RUN wget -O trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/v0.60.0/trivy_0.60.0_Linux-64bit.tar.gz" && \
+    tar -xvzf trivy.tar.gz -C /opt && \
+    ln -s /opt/trivy /usr/bin/trivy && \
+    rm trivy.tar.gz
 
 # Verify installations
-RUN java -version && sonar-scanner --version && trivy --version
+RUN sonar-scanner --version && trivy --version && docker --version
 
-# Set working directory
-WORKDIR /app
-
-# Default command
-CMD ["sh"]
+CMD ["/bin/sh"]
