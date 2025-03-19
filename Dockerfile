@@ -1,36 +1,43 @@
-# Base image with Docker-in-Docker
-FROM docker:24.0.1-dind AS base
+# Use the latest Alpine image with security patches
+FROM alpine:3.19
 
-# Install required dependencies
-RUN apk update && apk add --no-cache \
-    openjdk11 \
+# Set environment variables
+ENV SONAR_SCANNER_VERSION=4.8.0.2856
+ENV TRIVY_VERSION=0.50.0
+ENV DOCKER_VERSION=24.0.7
+
+# Install necessary packages and update vulnerable components
+RUN apk add --no-cache \
+    busybox \
+    krb5-libs \
+    docker-cli=${DOCKER_VERSION}-r0 \
+    containerd \
+    runc \
     curl \
-    unzip \
-    python3 \
-    py3-pip \
+    openjdk17-jre \
+    bash \
     git \
-    jq \
-    wget \
-    && rm -rf /var/cache/apk/*
+    unzip
 
-# Install SonarScanner
-RUN curl -fsSL -o /tmp/sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.7.0.2747-linux.zip" \
-    && unzip /tmp/sonar-scanner.zip -d /opt \
-    && ln -s /opt/sonar-scanner-4.7.0.2747-linux/bin/sonar-scanner /usr/bin/sonar-scanner \
-    && sed -i 's/use_embedded_jre=true/use_embedded_jre=false/' /opt/sonar-scanner-4.7.0.2747-linux/bin/sonar-scanner \
-    && rm -rf /tmp/sonar-scanner.zip
+# Upgrade BusyBox to a secure version
+RUN apk upgrade --no-cache busybox
 
-# Install Trivy
-RUN wget -O /tmp/trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/v0.60.0/trivy_0.60.0_Linux-64bit.tar.gz" \
-    && tar -xvzf /tmp/trivy.tar.gz -C /opt \
-    && ln -s /opt/trivy /usr/bin/trivy \
-    && rm -rf /tmp/trivy.tar.gz
+# Download and install Sonar Scanner
+RUN curl -fsSL "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux.zip" -o /tmp/sonar-scanner.zip \
+    && unzip /tmp/sonar-scanner.zip -d /opt/ \
+    && rm /tmp/sonar-scanner.zip
+
+# Set up Sonar Scanner
+ENV PATH="/opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux/bin:$PATH"
+
+# Install Trivy (latest version)
+RUN curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" | tar xz -C /usr/local/bin
 
 # Verify installations
-RUN docker --version && python3 --version && sonar-scanner --version && trivy --version
+RUN docker --version && sonar-scanner --version && trivy --version
 
 # Set working directory
 WORKDIR /app
 
 # Default command
-CMD ["dockerd-entrypoint.sh"]
+CMD ["sh"]
